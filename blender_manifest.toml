@@ -2,11 +2,11 @@ schema_version = "1.0.0"
 id = "air_cursor"
 version = "1.0.0"
 name = "Air Cursor"
-tagline = "Autonomous AI cursor operating inside Blender with minimum-jerk kinematics and human input isolation"
+tagline = "Autonomous AI cursor with minimum-jerk kinematics"
 maintainer = "Mayank Kumar <kumarmayank3689@gmail.com>"
 type = "add-on"
 website = "https://github.com/mostlyunstable/air-cursor"
-tags = ["3D View", "Animation", "Interface"]
+tags = ["3D View", "Animation", "User Interface"]
 blender_version_min = "4.0.0"
 license = [
     "SPDX:MIT",

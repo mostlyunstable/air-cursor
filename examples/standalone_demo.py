@@ -9,30 +9,40 @@ import socket
 import json
 import time
 
-BLENDER_PORT = 9876
+AIR_CURSOR_PORT = 9880
+FALLBACK_PORT = 9876
 
 def send_code(code_str, timeout=10.0):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(timeout)
-    s.connect(('127.0.0.1', BLENDER_PORT))
-    payload = {"type": "execute_code", "params": {"code": code_str}}
-    s.sendall(json.dumps(payload).encode('utf-8'))
-    chunks = []
-    while True:
+    for port in (AIR_CURSOR_PORT, FALLBACK_PORT):
         try:
-            c = s.recv(4096)
-            if not c:
-                break
-            chunks.append(c)
-            try:
-                parsed = json.loads(b''.join(chunks).decode('utf-8'))
-                break
-            except Exception:
-                pass
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect(('127.0.0.1', port))
+            payload = {
+                "cmd": "execute_code",
+                "code": code_str,
+                "type": "execute_code",
+                "params": {"code": code_str}
+            }
+            s.sendall(json.dumps(payload).encode('utf-8'))
+            chunks = []
+            while True:
+                c = s.recv(4096)
+                if not c:
+                    break
+                chunks.append(c)
+                try:
+                    parsed = json.loads(b''.join(chunks).decode('utf-8'))
+                    s.close()
+                    return parsed
+                except Exception:
+                    pass
+            s.close()
+            if chunks:
+                return json.loads(b''.join(chunks).decode('utf-8'))
         except Exception:
-            break
-    s.close()
-    return json.loads(b''.join(chunks).decode('utf-8'))
+            continue
+    raise ConnectionError("Could not connect to Blender on port 9880 or 9876")
 
 def main():
     print("=" * 70)

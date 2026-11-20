@@ -45,6 +45,21 @@ Traditional desktop automation hijacks or warps the operating system's physical 
 
 ---
 
+## Live Demonstration Recording
+
+![Air Cursor Live Demo](docs/assets/air_cursor_demo.gif)
+
+*Demonstration recorded live in Blender 5.2.3 LTS:*
+1. **Operator Initialization**: Air Cursor initializes on port 9880 without external dependencies.
+2. **Viewport Navigation**: Glides smoothly to 3D Viewport canvas; triggers 150ms ripple to select default Cube.
+3. **Outliner Traversal**: Crosses editor boundary into the Outliner; triggers click ripple to select Light.
+4. **Properties Hover**: Smooth vertical descent into Properties inspector with hover aura activated.
+5. **In-Flight Pause & Resume**: Pauses mid-flight holding exact coordinates, resuming seamlessly.
+6. **Final Operation Execution**: Returns to Viewport and executes main-thread object transform.
+*(Also available as high-definition MP4 in [`docs/assets/air_cursor_demo.mp4`](docs/assets/air_cursor_demo.mp4))*
+
+---
+
 ## Benchmark Performance & Acceptance Verification
 
 Measured live inside Blender 5.2.3 LTS on Apple Silicon Metal GPU:

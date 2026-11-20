@@ -8,16 +8,28 @@ import socket
 import json
 import time
 
-BLENDER_PORT = 9876
+AIR_CURSOR_PORT = 9880
+FALLBACK_PORT = 9876
 
-def send_code(code_str):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('127.0.0.1', BLENDER_PORT))
-    payload = {"type": "execute_code", "params": {"code": code_str}}
-    s.sendall(json.dumps(payload).encode('utf-8'))
-    raw = s.recv(4096)
-    s.close()
-    return json.loads(raw.decode('utf-8'))
+def send_code(code_str, timeout=10.0):
+    for port in (AIR_CURSOR_PORT, FALLBACK_PORT):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect(('127.0.0.1', port))
+            payload = {
+                "cmd": "execute_code",
+                "code": code_str,
+                "type": "execute_code",
+                "params": {"code": code_str}
+            }
+            s.sendall(json.dumps(payload).encode('utf-8'))
+            raw = s.recv(4096)
+            s.close()
+            return json.loads(raw.decode('utf-8'))
+        except Exception:
+            continue
+    raise ConnectionError("Could not connect to Blender on port 9880 or 9876")
 
 def main():
     print("[1] Initializing Air Cursor in Blender...")

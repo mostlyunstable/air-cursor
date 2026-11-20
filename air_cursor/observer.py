@@ -17,20 +17,30 @@ except ImportError:
     QUARTZ_AVAILABLE = False
 
 DEFAULT_PORT = 8088
-DEFAULT_BLENDER_PORT = 9876
+DEFAULT_AIR_CURSOR_PORT = 9880
+DEFAULT_FALLBACK_PORT = 9876
 
-def send_blender_code(code_str, port=DEFAULT_BLENDER_PORT):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2.0)
-        s.connect(('127.0.0.1', port))
-        payload = {"type": "execute_code", "params": {"code": code_str}}
-        s.sendall(json.dumps(payload).encode('utf-8'))
-        raw = s.recv(8192)
-        s.close()
-        return json.loads(raw.decode('utf-8'))
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+def send_blender_cmd(payload, port=DEFAULT_AIR_CURSOR_PORT):
+    for p in (port, DEFAULT_FALLBACK_PORT):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2.0)
+            s.connect(('127.0.0.1', p))
+            s.sendall(json.dumps(payload).encode('utf-8'))
+            raw = s.recv(8192)
+            s.close()
+            return json.loads(raw.decode('utf-8'))
+        except Exception:
+            continue
+    return {"status": "error", "message": "Failed to connect to Blender"}
+
+def send_blender_code(code_str, port=DEFAULT_AIR_CURSOR_PORT):
+    return send_blender_cmd({
+        "cmd": "execute_code",
+        "code": code_str,
+        "type": "execute_code",
+        "params": {"code": code_str}
+    }, port=port)
 
 def get_human_cursor_pos():
     if not QUARTZ_AVAILABLE:
@@ -42,7 +52,10 @@ def get_human_cursor_pos():
     except Exception as e:
         return {"x": 0.0, "y": 0.0, "error": str(e)}
 
-def get_blender_telemetry(port=DEFAULT_BLENDER_PORT):
+def get_blender_telemetry(port=DEFAULT_AIR_CURSOR_PORT):
+    res = send_blender_cmd({"cmd": "telemetry"}, port=port)
+    if res.get("status") == "ok" and "telemetry" in res:
+        return res["telemetry"]
     code = """
 import air_cursor
 import json
@@ -66,13 +79,25 @@ print('TELEMETRY_JSON:' + json.dumps(air_cursor.get_telemetry()))
         "is_active": False
     }
 
-def capture_blender_jpeg(port=DEFAULT_BLENDER_PORT):
+def capture_blender_jpeg(port=DEFAULT_AIR_CURSOR_PORT):
     dest_path = "/tmp/air_cursor_observer_snap.png"
     code = f"""
 import bpy
 window = bpy.context.window_manager.windows[0]
 with bpy.context.temp_override(window=window):
     bpy.ops.screen.screenshot(filepath='{dest_path}')
+"""
+    send_blender_code(code, port=port)
+    try:
+        if os.path.exists(dest_path):
+            pil_img = Image.open(dest_path)
+            pil_img.thumbnail((1440, 900), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            pil_img.save(buf, format='JPEG', quality=80)
+            return buf.getvalue()
+    except Exception as e:
+        print(f"Capture error: {e}")
+    return None
 """
     send_blender_code(code, port=port)
     try:
@@ -231,14 +256,9 @@ class ObserverHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        cmd_map = {
-            "/api/start": "import air_cursor; air_cursor.start_operator()",
-            "/api/pause": "import air_cursor; air_cursor.pause_operator()",
-            "/api/resume": "import air_cursor; air_cursor.resume_operator()",
-            "/api/stop": "import air_cursor; air_cursor.emergency_stop()"
-        }
-        if parsed.path in cmd_map:
-            res = send_blender_code(cmd_map[parsed.path])
+        cmd_action = parsed.path.lstrip("/api/")
+        if cmd_action in ("start", "pause", "resume", "stop"):
+            res = send_blender_cmd({"cmd": cmd_action})
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
